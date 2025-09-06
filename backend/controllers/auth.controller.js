@@ -43,16 +43,18 @@ export const registerUser = async(req,res) => {
 export const loginUser = async(req,res)=>{
    try {
      const data = loginSchema.parse(req.body);
-    
+
      if(!data) {
-             return res.status(400).json({ msg : "Failed to process data"})
+         return res.status(400).json({ msg : "Failed to process data"})
      };
- 
-     const user = await User.findOne({email : data.email});
+     
+     const user = await User.findOne({email : data.email}).select("+password");
      if(!user) return res.status(400).json({ msg : "Invalid Email"});
- 
+
+
+
      const isMatch = await bcrypt.compare(data.password, user.password);
-     if (!isMatch) return res.status(400).json({ msg : "Invalid password"});
+     if (!isMatch) return res.status(400).json({ msg : "Invalid password" });
  
      const token = jwt.sign({ id : user._id } , process.env.JWT_SECRET , { expiresIn : "5h"});
  
@@ -61,7 +63,7 @@ export const loginUser = async(req,res)=>{
          maxAge: 24 * 60 * 60 * 1000,
      })
 
-      res.status(200).json({
+     res.status(200).json({
       success: true,
       message: "Login successful",
       token,
@@ -69,7 +71,6 @@ export const loginUser = async(req,res)=>{
         id: user._id,
         name: user.name,
     }});
- 
    } catch (error) {
     res.status(400).json({ msg: error.message });
    }
