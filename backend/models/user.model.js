@@ -46,6 +46,19 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }  
 );
 
+const accountSchema = new mongoose.Schema({
+  userID : {
+    type : mongoose.Schema.Types.ObjectId,
+    ref : "User",
+    required : true,
+  },
+  balance : {
+    type : Number,
+    required : true,
+    default : 0,
+  }
+})
+
 userSchema.pre("save" , async function(next){
     if(this.isModified("password")){
         this.password = await bcrypt.hash(this.password,10);
@@ -55,3 +68,4 @@ userSchema.pre("save" , async function(next){
 })
 
 export const User = mongoose.model("User",userSchema);
+export const Account = mongoose.model("Account",accountSchema);

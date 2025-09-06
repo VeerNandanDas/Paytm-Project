@@ -3,6 +3,7 @@ import { User } from "../models/user.model.js"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import { loginSchema, registerSchema } from "../models/auth.model.js"
+import { email, success } from "zod"
 
 export const registerUser = async(req,res) => {
     try {
@@ -77,8 +78,6 @@ export const loginUser = async(req,res)=>{
 }
 
 
-
-
 export const deleteUser = async (req,res) => {
    try {
      const { email , password } = req.body;
@@ -98,3 +97,69 @@ export const deleteUser = async (req,res) => {
 
 
 }
+
+export const UpdateUser = async (req,res) => {
+
+try {
+        const { email , name , password } = req.body;
+        let user;
+
+        if(req.user){
+            user = await User.findById(req.user.id);
+        }
+        
+        if(email){
+            user = await User.findOne({email});
+        }
+        
+        if(!user) return res.status(400).json({ msg : "User not found"});
+    
+        if(name){
+            user.name = name;
+        }
+    
+        if(password){
+            user.password = await bcrypt.hash(password,10);
+        }
+    
+        await user.save();
+    
+        res.status(200).json({
+            success:true,
+            message : "Updated succesfully",
+            user : {
+                id : user._id,
+                name : user.name,
+                email : user.email
+            }
+        })
+    
+} catch (error) {
+    console.log("error while updating  " , error.message);
+    res.status(500).json({ success : false , message : "server error"})
+}
+
+}
+
+
+export const findUser = async (req, res) => {
+  try {
+    const filter = req.query.filter || "";
+
+    // Find all users with regex on name
+    const users = await User.find({
+      name: { $regex: filter, $options: "i" } // "i" = case insensitive
+    }).select("name _id"); // only return name and _id
+
+    res.json({
+      success: true,
+      users: users.map(user => ({
+        name: user.name,
+        _id: user._id
+      }))
+    });
+  } catch (error) {
+    console.error("Error finding users:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};

@@ -3,6 +3,7 @@ import { connectDB } from "./DB/db.js";
 import cors from "cors"
 import cookieParser from "cookie-parser";
 import userRouter from "./routes/user.routes.js";
+import accountRouter from "./routes/account.routes.js";
 
 
 const app = express();
@@ -22,7 +23,8 @@ app.use(
 );
 
 
-app.use("/api/v1/users" , userRouter)
+app.use("/api/v1/users" , userRouter);
+app.use("/api/v1/account" , accountRouter );
 
 
 app.get("/" , (req,res) => {
