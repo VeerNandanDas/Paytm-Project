@@ -1,5 +1,5 @@
 import mongoose from "mongoose"
-import { User } from "../models/user.model.js"
+import { Account, User } from "../models/user.model.js"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import { loginSchema, registerSchema } from "../models/auth.model.js"
@@ -31,8 +31,27 @@ export const registerUser = async(req,res) => {
         );
 
         newUser.verificationToken = token;
-        await newUser.save(); // save to DB
-        console.log(newUser);
+        await newUser.save(); 
+
+        const newAccount = new Account({
+            userID: newUser._id,
+            balance : 0,
+        })
+
+        await newAccount.save();
+
+        console.log("Signup Complete" , newUser);
+        console.log("Account Created" , newAccount);
+
+        res.cookie('token', token, {
+            httpOnly: true, // prevents JavaScript access
+            secure: process.env.NODE_ENV === 'production', // only send over HTTPS in production
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+            sameSite: 'strict' // prevents CSRF
+        });
+
+
+        
         res.status(200).json({ msg: "signup complete" });
     } catch (error) {
         res.status(400).json({ msg: error.message });
