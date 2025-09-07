@@ -1,6 +1,7 @@
 import { success } from "zod";
 import { Account } from "../models/account.model.js"
 import mongoose from "mongoose"
+import { User } from "../models/user.model.js";
 
 export const getBalance = async (req, res) => {
    try {
@@ -51,52 +52,152 @@ export const getBalance = async (req, res) => {
 };
 
 
-export const MoneyTransfer = async(req,res) => {
+    export const MoneyTransfer = async(req,res) => {
 
-  try {
-      //starts the session 
-      const session = await mongoose.startSession();
-      session.startTransaction();
+        //starts the session 
+        const session = await mongoose.startSession();
+
+
+    try {
+            session.startTransaction();
+            //get the dta from request body
+            const { amount , to} = req.body;
+        
+            //validation of data 
+            if( !amount || !to){
+                await session.abortTransaction();
+                return res.status(400).json({
+                    succes : false,
+                    msg : "Amount and id is needed",
+                })
+            }
+        
+            //validation of amount nature (- or +)
+        
+            if(amount <= 0){
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success : false,
+                    msg : 'Amount has to be Positive or Non Zero',
+                })
+            }
+        
+        
+            //get senders id from token 
+        
+            const senderId =  req.user.id || req.user._id;
+        
+            //validate senders id
+            if(!senderId) return res.status(400).json({
+                success : false ,
+                msg : "SenderId not found",
+            })
+        
+            //check if he is sendinf to himself
+            if(senderId.toString() === to.toString()){
+                await session.abortTransaction();
+                return res.status(400).json({
+                success : false,
+                msg : 'You cannot send to yourself',
+                })
+            }
+        
+            //get senders account 
+        
+            const senderAccount = await Account.findOne({
+                userID : new mongoose.Types.ObjectId(senderId)
+            }).session(session)
+        
+        
+            console.log("Sender account:", senderAccount);
+        
+        
+            //validate
+            if (!senderAccount) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    msg: "Sender account not found",
+                });
+            }
+        
+            //check amount he have in account
+            if(amount > senderAccount.balance){
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success : false,
+                    msg : "insufficient Balance"
+                })
+            }
+
+                    
+        
+            //find receivers account
+        
+            const receiverAccount = await Account.findOne({
+                userID:  new mongoose.Types.ObjectId(to)
+            }).session(session);
+        
+            //validate
+            if (!receiverAccount){
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    msg: "Receiver  not found",
+                });
+            };
+        
+            //get sender and receiver name for log
+            const senderUser = await User.findById(senderId).select('name email').session(session);
+            const receiverUser = await User.findById(to).select('name email').session(session);
+        
+            //perform transcation
+            await Account.updateOne(
+                { userID: new mongoose.Types.ObjectId(senderId) }, 
+                { $inc: { balance: -amount } }
+            ).session(session);
+        
+        
+        
+            await Account.updateOne(
+                { userID: new mongoose.Types.ObjectId(to) }, 
+                { $inc: { balance: amount } }
+            ).session(session);
+            //commit session
+        
+            await session.commitTransaction();
+            //response 
+            res.status(200).json({
+                success: true,
+                message: "Transfer completed successfully",
+                transfer: {
+                    from: {
+                        id: senderId,
+                        name: senderUser.name,
+                        newBalance: senderAccount.balance - amount
+                    },
+                    to: {
+                        id: to,
+                        name: receiverUser.name,
+                        newBalance: receiverAccount.balance + amount
+                    },
+                    amount: amount,
+                    timestamp: new Date()
+                }
+            });
+    } catch (error) {
+        await session.abortTransaction();
+        console.log("❌ Transfer failed:", error.message);
+        res.status(500).json({
+            success: false,
+            message: "Transfer failed",
+            error: error.message
+        });
+    } finally {
+        session.endSession();
+    }
+    };
+
+
+
   
-      //get the data
-      const { amount , to} = req.body;
-  
-      //find the account 
-      const account = await Account.findOne({ userId : req.userId}).session(session);
-      console.log(account);
-  
-      if( !account || amount > account.balance){
-          await session.abortTransaction();
-          res.status(400).json({
-              success : false,
-              msg : "Low Balance or Account doesnt exist",
-          })
-      }
-  
-      //find receiver account 
-      const receiver = await mongoose.findOne({ userId : to}).session(session);
-  
-      if(!receiver){
-          await session.abortTransaction();
-          res.status(400).json({
-              success:false,
-              msg : "receiver doesnt exists",
-          })
-      }
-      
-      //perform the transcation
-      await Account.updateOne({ userId : req.userId},{ $inc : { balance : -account }}).session(session);
-      await Account.updateOne({ userId : to} , {$inc : {balance : amount }}).session(session);
-  
-  
-  
-      //commit the transcation
-      await session.commitTransaction();
-      res.json({
-          message : "Transfer successfully",
-      })
-  
-  } catch (error) {
-    console.log("error is : " , error.message)
-  }
-;}

@@ -10,7 +10,12 @@ import { email, success } from "zod"
 
 
 export const registerUser = async(req,res) => {
+    const session = await mongoose.startSession();
+
     try {
+        session.startTransaction();
+
+
         const data = registerSchema.parse(req.body);
         const { name, email, password } = data;
 
@@ -18,10 +23,10 @@ export const registerUser = async(req,res) => {
             return res.status(400).json({ msg: "Failed to process data" });
         }
 
-        const userExists = await User.findOne({ email });
+        const userExists = await User.findOne({ email }).session(session);
         if (userExists) return res.status(400).json({ msg: "User already exists" }); // fixed typo
 
-        const newUser = new User(data); // create instance
+        const newUser = new User(data); 
 
         const token = jwt.sign(
             {
@@ -36,20 +41,29 @@ export const registerUser = async(req,res) => {
 
         newUser.verificationToken = token;
 
+        await newUser.save({ session });
+
         const newAccount = new Account({
             userID: newUser._id,
            balance: Math.floor(1 + Math.random()*1000),
         })
-        await newAccount.save();
+        await newAccount.save({ session });
 
         
         newUser.account = newAccount._id;
-        await newUser.save();
+        await newUser.save({ session });
+
         
 
+        await session.commitTransaction();
 
-        console.log("Signup Complete" , newUser);
-        console.log("Account Created" , newAccount);
+        console.log("✅ User registered successfully:", {
+            userId: newUser._id,
+            email: newUser.email,
+            accountId: newAccount._id,
+            balance: newAccount.balance
+        });
+
 
         res.cookie('token', token, {
             httpOnly: true, // prevents JavaScript access
@@ -60,8 +74,21 @@ export const registerUser = async(req,res) => {
 
 
         
-        res.status(200).json({ msg: "signup complete" });
+        res.status(201).json({ 
+            success: true,
+            message: "Registration successful",
+            user: {
+                id: newUser._id,
+                name: newUser.name,
+                email: newUser.email,
+                accountId: newAccount._id,
+                balance: newAccount.balance
+            }
+        });
+
+
     } catch (error) {
+        await session.abortTransaction();
         res.status(400).json({ msg: error.message });
     }
 
