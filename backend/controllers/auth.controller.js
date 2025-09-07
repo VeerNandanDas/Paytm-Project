@@ -1,9 +1,13 @@
 import mongoose from "mongoose"
-import { Account, User } from "../models/user.model.js"
+import {  User } from "../models/user.model.js"
+import { Account } from "../models/account.model.js"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import { loginSchema, registerSchema } from "../models/auth.model.js"
 import { email, success } from "zod"
+
+
+
 
 export const registerUser = async(req,res) => {
     try {
@@ -31,14 +35,18 @@ export const registerUser = async(req,res) => {
         );
 
         newUser.verificationToken = token;
-        await newUser.save(); 
 
         const newAccount = new Account({
             userID: newUser._id,
-            balance : 0,
+           balance: Math.floor(1 + Math.random()*1000),
         })
-
         await newAccount.save();
+
+        
+        newUser.account = newAccount._id;
+        await newUser.save();
+        
+
 
         console.log("Signup Complete" , newUser);
         console.log("Account Created" , newAccount);

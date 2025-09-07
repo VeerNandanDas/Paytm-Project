@@ -29,11 +29,6 @@ const userSchema = new mongoose.Schema(
       minlength: [8, "Password must be at least 8 characters long"],
       select: false, // never return password in queries by default
     },
-    userBalance: {
-      type: Number,
-      default: 0,
-      min: [0, "Balance cannot be negative"],
-    },
     verificationToken: {
       type: String,
       default: null,
@@ -42,22 +37,16 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    account : {
+      type : mongoose.Schema.Types.ObjectId,
+      ref : "Account"
+    }
+    
   },
   { timestamps: true }  
 );
 
-const accountSchema = new mongoose.Schema({
-  userID : {
-    type : mongoose.Schema.Types.ObjectId,
-    ref : "User",
-    required : true,
-  },
-  balance : {
-    type : Number,
-    required : true,
-    default : 0,
-  }
-})
+
 
 userSchema.pre("save" , async function(next){
     if(this.isModified("password")){
@@ -68,4 +57,3 @@ userSchema.pre("save" , async function(next){
 })
 
 export const User = mongoose.model("User",userSchema);
-export const Account = mongoose.model("Account",accountSchema);
